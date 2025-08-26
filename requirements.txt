@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+openai
+pydub
+torchaudio
+numpy
+whisper
+transformers
