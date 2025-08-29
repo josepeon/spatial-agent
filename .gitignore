@@ -1,6 +1,7 @@
-echo ".venv/" >> .gitignore
-echo "__pycache__/" >> .gitignore
-echo "*.pyc" >> .gitignore
-echo "*.wav" >> .gitignore
-echo "*.mp4" >> .gitignore
-echo ".DS_Store" >> .gitignoreconfig/secrets.json
+.venv/
+__pycache__/
+*.pyc
+*.wav
+*.mp4
+.DS_Store
+config/secrets.json
