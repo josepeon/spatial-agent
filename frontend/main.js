@@ -30,7 +30,26 @@ socket.onopen = () => {
 
 socket.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  responseText.innerText = `Agent: ${data.text}`;
+
+  // Create and append message container
+  const chatBox = document.getElementById("chatBox") || (() => {
+    const box = document.createElement("div");
+    box.id = "chatBox";
+    document.body.appendChild(box);
+    return box;
+  })();
+
+  const userMsg = document.createElement("div");
+  userMsg.innerText = `You: [your question here]`; // Replace dynamically if needed
+  userMsg.style.margin = "10px 0";
+
+  const agentMsg = document.createElement("div");
+  agentMsg.innerText = `Agent: ${data.text}`;
+  agentMsg.style.margin = "10px 0";
+
+  chatBox.appendChild(userMsg);
+  chatBox.appendChild(agentMsg);
+
   const audioBlob = base64ToBlob(data.audio_base64, "audio/wav");
   audioPlayback.src = URL.createObjectURL(audioBlob);
   audioPlayback.play();

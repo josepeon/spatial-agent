@@ -24,6 +24,19 @@ client = openai.OpenAI(api_key=secrets["openai_api_key"])
 use_openai = True
 model = whisper.load_model("base")
 
+message_history = [{"role": "system", "content": "You are a helpful AI avatar."}]
+
+# Function to generate speech using OpenAI TTS
+def generate_speech_openai(text, voice="nova", output_path="temp_audio/response.wav"):
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice=voice,
+        input=text,
+    )
+    with open(output_path, "wb") as f:
+        f.write(response.content)
+    return output_path
+
 @app.get("/")
 async def root():
     return {"message": "Spatial Agent backend is running."}
@@ -53,20 +66,21 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # Get response from GPT-4
             if use_openai:
+                message_history.append({"role": "user", "content": user_text})
                 response = client.chat.completions.create(
                     model="gpt-4",
-                    messages=[
-                        {"role": "system", "content": "You are a helpful AI avatar."},
-                        {"role": "user", "content": user_text}
-                    ]
+                    messages=message_history
                 )
                 response_text = response.choices[0].message.content.strip()
+                message_history.append({"role": "assistant", "content": response_text})
             else:
                 response_text = "(Local LLM not yet implemented)"
 
-            # Return real text, still using static audio
-            dummy_audio_path = "assets/response_sample.wav"
-            with open(dummy_audio_path, "rb") as f:
+            # Generate TTS response from GPT-4 reply
+            audio_path = generate_speech_openai(response_text)
+
+            # Read audio and encode to base64
+            with open(audio_path, "rb") as f:
                 audio_bytes = f.read()
                 audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
 
