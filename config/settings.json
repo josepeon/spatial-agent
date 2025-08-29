@@ -1,0 +1,8 @@
+{
+  "use_openai": true,
+  "openai_api_key": "ENV",
+  "local_llm_host": "http://localhost:11434",
+  "tts_engine": "tortoise",
+  "emotion_model": "basic",
+  "avatar_model_path": "public/avatar.glb"
+}
