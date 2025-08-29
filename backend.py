@@ -17,10 +17,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import logging
+
 # Load config
-with open("config/secrets.json") as f:
-    secrets = json.load(f)
-client = openai.OpenAI(api_key=secrets["openai_api_key"])
+try:
+    with open("config/secrets.json") as f:
+        secrets = json.load(f)
+    client = openai.OpenAI(api_key=secrets["openai_api_key"])
+except Exception as e:
+    raise RuntimeError(f"Failed to load API key: {e}")
 use_openai = True
 model = whisper.load_model("base")
 
@@ -28,14 +33,18 @@ message_history = [{"role": "system", "content": "You are a helpful AI avatar."}
 
 # Function to generate speech using OpenAI TTS
 def generate_speech_openai(text, voice="nova", output_path="temp_audio/response.wav"):
-    response = client.audio.speech.create(
-        model="tts-1",
-        voice=voice,
-        input=text,
-    )
-    with open(output_path, "wb") as f:
-        f.write(response.content)
-    return output_path
+    try:
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice,
+            input=text,
+        )
+        with open(output_path, "wb") as f:
+            f.write(response.content)
+        return output_path
+    except Exception as e:
+        print(f"Speech generation failed: {e}")
+        return None
 
 @app.get("/")
 async def root():
@@ -59,30 +68,44 @@ async def websocket_endpoint(websocket: WebSocket):
                 f.write(audio_bytes)
 
             # Transcribe with Whisper
-            print("Transcribing...")
-            result = model.transcribe(audio_path)
-            user_text = result["text"]
-            print("User said:", user_text)
+            try:
+                print("Transcribing...")
+                result = model.transcribe(audio_path)
+                user_text = result["text"]
+                print("User said:", user_text)
+            except Exception as e:
+                print(f"Transcription failed: {e}")
+                continue
 
             # Get response from GPT-4
             if use_openai:
                 message_history.append({"role": "user", "content": user_text})
-                response = client.chat.completions.create(
-                    model="gpt-4",
-                    messages=message_history
-                )
-                response_text = response.choices[0].message.content.strip()
-                message_history.append({"role": "assistant", "content": response_text})
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4",
+                        messages=message_history
+                    )
+                    response_text = response.choices[0].message.content.strip()
+                    message_history.append({"role": "assistant", "content": response_text})
+                    message_history[:] = message_history[-10:]  # Limit history to last 10 messages
+                except Exception as e:
+                    print(f"GPT-4 response generation failed: {e}")
+                    response_text = "Sorry, something went wrong."
             else:
                 response_text = "(Local LLM not yet implemented)"
 
             # Generate TTS response from GPT-4 reply
             audio_path = generate_speech_openai(response_text)
-
-            # Read audio and encode to base64
-            with open(audio_path, "rb") as f:
-                audio_bytes = f.read()
-                audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+            if audio_path:
+                try:
+                    with open(audio_path, "rb") as f:
+                        audio_bytes = f.read()
+                        audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+                except Exception as e:
+                    print(f"Failed to read generated audio: {e}")
+                    audio_base64 = ""
+            else:
+                audio_base64 = ""
 
             await websocket.send_json({
                 "text": response_text,
